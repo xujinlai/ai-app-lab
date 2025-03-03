@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import os
 from typing import Type
 
 import fastapi
@@ -24,6 +24,8 @@ from arkitect.core.runtime import RequestType
 
 from .base import get_client_pool
 
+from openai import OpenAI, AsyncOpenAI
+import lunary
 
 def default_ark_client() -> AsyncArk:
     """
@@ -36,10 +38,14 @@ def default_ark_client() -> AsyncArk:
     Returns:
         AsyncArk: An instance of the AsyncArk client.
     """
-    client_pool = get_client_pool()
-    client: AsyncArk = client_pool.get_client("ark")  # type: ignore
-    if not client:
-        client = AsyncArk(timeout=Timeout(connect=1.0, timeout=60.0))
+    # client_pool = get_client_pool()
+    # client: AsyncArk = client_pool.get_client("ark")  # type: ignore
+    # if not client:
+    client = AsyncOpenAI(
+        api_key=os.environ.get("ARK_API_KEY"),
+        base_url="https://ark.cn-beijing.volces.com/api/v3",
+        timeout=1800)
+    lunary.monitor(client)
     return client
 
 

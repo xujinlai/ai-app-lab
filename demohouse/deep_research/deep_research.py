@@ -173,7 +173,8 @@ class DeepResearch(BaseModel):
             planning_result = ""
 
             async for chunk in stream:
-                if chunk.choices[0].delta.reasoning_content:
+                print(f"#### debug chunk: {type(chunk)}, {chunk}")
+                if hasattr(chunk.choices[0].delta, 'reasoning_content') and chunk.choices[0].delta.reasoning_content:
                     yield chunk
                 elif chunk.choices[0].delta.content:
                     planning_result += chunk.choices[0].delta.content

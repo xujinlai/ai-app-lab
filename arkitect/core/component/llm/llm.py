@@ -39,6 +39,8 @@ from .model import (
 )
 from .utils import format_ark_prompts
 
+from openai.types.chat import ChatCompletionChunk as OpenAIChatCompletionChunk
+from openai.types.chat import ChatCompletion as OpenAIChatCompletion
 
 class BaseChatLanguageModel(BaseLanguageModel):
     messages: List[ArkMessage]
@@ -97,7 +99,7 @@ class BaseChatLanguageModel(BaseLanguageModel):
         extra_query: Optional[Dict[str, Any]] = None,
         extra_body: Optional[Dict[str, Any]] = None,
     ) -> Union[ChatCompletion, AsyncStream[ChatCompletionChunk]]:
-        assert isinstance(self.client, AsyncArk), TypeError("Invalid Client for v3 sdk")
+        # assert isinstance(self.client, AsyncArk), TypeError("Invalid Client for v3 sdk")
 
         params = request.get_chat_request(extra_body)
 
@@ -214,10 +216,13 @@ class BaseChatLanguageModel(BaseLanguageModel):
             **parameters,
         )
         responses = []
+        openai_resp = False
         while True:
-            completion: ChatCompletion = await self._arun(
+            completion: Union[ChatCompletion, OpenAIChatCompletion] = await self._arun(
                 request, extra_headers, extra_query, extra_body
             )
+            if isinstance(completion, OpenAIChatCompletion):
+                openai_resp = True
             responses.append(completion)
 
             if completion.choices and completion.choices[0].finish_reason:
@@ -225,8 +230,10 @@ class BaseChatLanguageModel(BaseLanguageModel):
                     request, completion, functions, function_call_mode
                 ):
                     break
-
-        return ArkChatResponse.merge(responses)
+        if openai_resp:
+            return OpenAIChatCompletion.merge(responses)
+        else:
+            return ArkChatResponse.merge(responses)
 
     async def astream(
         self,
@@ -266,6 +273,7 @@ class BaseChatLanguageModel(BaseLanguageModel):
         )
 
         usage_chunks = []
+        openai_resp = False
         while True:
             completion = await self._arun(
                 request, extra_headers, extra_query, extra_body
@@ -274,7 +282,10 @@ class BaseChatLanguageModel(BaseLanguageModel):
             is_more_request = False
             final_tool_calls = {}
             cumulated = []
+                
             async for resp in completion:  # type: ChatCompletionChunk
+                if isinstance(resp, OpenAIChatCompletionChunk):
+                    openai_resp = True
                 if resp.usage:
                     usage_chunks.append(resp)
                     continue
@@ -294,9 +305,15 @@ class BaseChatLanguageModel(BaseLanguageModel):
                 else:
                     # hide tool_calls info from response
                     if resp.choices[0].finish_reason != "tool_calls":
-                        yield ArkChatCompletionChunk(**resp.__dict__)
+                        if openai_resp:
+                            yield OpenAIChatCompletionChunk(**resp.__dict__)
+                        else:
+                            yield ArkChatCompletionChunk(**resp.__dict__)
                 if resp.choices[0].finish_reason == "tool_calls":
-                    ark_resp = ArkChatCompletionChunk.merge(cumulated)
+                    if openai_resp:
+                        ark_resp = OpenAIChatCompletionChunk.merge(cumulated)
+                    else:
+                        ark_resp = ArkChatCompletionChunk.merge(cumulated)
                     ark_resp.choices[0].delta.tool_calls = list(  # type: ignore
                         final_tool_calls.values()
                     )
@@ -308,4 +325,7 @@ class BaseChatLanguageModel(BaseLanguageModel):
                 break
 
         if len(usage_chunks) > 0:
-            yield ArkChatCompletionChunk.merge(usage_chunks)
+            if openai_resp:
+                yield OpenAIChatCompletionChunk.merge(usage_chunks)
+            else:
+                yield ArkChatCompletionChunk.merge(usage_chunks)

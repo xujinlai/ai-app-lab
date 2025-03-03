@@ -28,9 +28,12 @@ def main():
     )
 
     thinking = False
-
+    
+    reasoning_content = ""
+    content = ""
+    
     for chunk in stream_resp:
-        if chunk.choices[0].delta.reasoning_content:
+        if hasattr(chunk.choices[0].delta, 'reasoning_content') and chunk.choices[0].delta.reasoning_content:
             if not thinking:
                 print("\n----思考过程----\n")
                 thinking = True
@@ -39,6 +42,7 @@ def main():
             if thinking:
                 print("\n----输出回答----\n")
                 thinking = False
+            content += chunk.choices[0].delta.content
             print(chunk.choices[0].delta.content, end="")
 
 

@@ -33,11 +33,11 @@ logging.basicConfig(
 LOGGER = logging.getLogger(__name__)
 
 # recommend to use DeepSeek-R1 model
-REASONING_EP_ID = "{YOUR_ENDPOINT_ID}"
+REASONING_EP_ID = "ep-20250206135327-9vgvh"
 # default set to volc bot, if using tavily, change it into "tavily"
-SEARCH_ENGINE = "volc_bot"
+SEARCH_ENGINE = "tavily"
 # optional, if you select tavily as search engine, please configure this
-TAVILY_API_KEY = "{YOUR_TAVILY_API_KEY}"
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 # optional, if you select volc bot as search engine, please configure this
 SEARCH_BOT_ID = "{YOUR_BOT_ID}"
 
