@@ -12,7 +12,7 @@
 from typing import Dict, List, AsyncIterable
 
 from jinja2 import Template
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 from typing_extensions import Optional
 
 from arkitect.core.component.llm import BaseChatLanguageModel
@@ -24,6 +24,8 @@ from search_engine import SearchEngine, SearchResult
 from search_engine.volc_bot import VolcBotSearchEngine
 from prompt import DEFAULT_PLANNING_PROMPT, DEFAULT_SUMMARY_PROMPT
 from utils import get_current_date, cast_content_to_reasoning_content
+
+import lunary
 
 """
 ResultsSummary is using to store the result searched so far
@@ -65,6 +67,14 @@ class ExtraConfig(BaseModel):
     # summary_template (prompt)
     summary_template: Template = DEFAULT_SUMMARY_PROMPT
 
+    @field_serializer("planning_template")
+    def serialize_planning_template(self, v: Template, _info):
+        return v.render()
+    
+    @field_serializer("summary_template")
+    def serialize_summary_template(self, v: Template, _info):
+        return v.render()
+    
     class Config:
         """Configuration for this pydantic object."""
 
@@ -82,15 +92,18 @@ class DeepResearch(BaseModel):
     summary_endpoint_id: str = Field(default_factory="")
     extra_config: ExtraConfig = Field(default_factory=ExtraConfig)
 
+    @lunary.agent(name="deep_research")
     async def arun_deep_research(self, request: ArkChatRequest, question: str) -> ArkChatResponse:
         references = ResultsSummary()
         buffered_reasoning_content = ""
 
+        run_id = "deep_research"
         # 1. run reasoning
         reasoning_stream = self.astream_planning(
             request=request,
             question=question,
             references=references,
+            parent=run_id,
         )
 
         async for reasoning_chunk in reasoning_stream:
@@ -107,22 +120,26 @@ class DeepResearch(BaseModel):
         resp = await self.arun_summary(
             request=request,
             question=question,
-            references=references
+            references=references,
+            parent=run_id,
         )
         # append the reasoning buffer
         resp.choices[0].message.reasoning_content = (buffered_reasoning_content + resp.choices[0].message.reasoning_content)
         return resp
 
+    @lunary.agent(name="deep_research")
     async def astream_deep_research(self, request: ArkChatRequest, question: str) \
             -> AsyncIterable[ArkChatCompletionChunk]:
         references = ResultsSummary()
         buffered_reasoning_content = ""
 
+        run_id = "deep_research"
         # 1. stream reasoning
         reasoning_stream = self.astream_planning(
             request=request,
             question=question,
             references=references,
+            parent=run_id,
         )
 
         async for reasoning_chunk in reasoning_stream:
@@ -141,22 +158,25 @@ class DeepResearch(BaseModel):
             request=request,
             question=question,
             references=references,
+            parent=run_id,
         )
 
         async for summary_chunk in summary_stream:
             yield summary_chunk
 
+    @lunary.chain(name="deep_research")
     async def astream_planning(
             self,
             request: ArkChatRequest,
             question: str,
-            references: ResultsSummary
+            references: ResultsSummary,
     ) -> AsyncIterable[ArkChatCompletionChunk]:
 
         planned_rounds = 0
         while planned_rounds < self.extra_config.max_planning_rounds:
             planned_rounds += 1
 
+            run_id = f"deep_research_round_{planned_rounds}"
             llm = BaseChatLanguageModel(
                 endpoint_id=self.planning_endpoint_id,
                 template=CustomPromptTemplate(template=self.extra_config.planning_template or DEFAULT_PLANNING_PROMPT),
@@ -167,13 +187,13 @@ class DeepResearch(BaseModel):
                 reference=references.to_plaintext(),  # pass the search result to prompt template
                 question=question,
                 max_search_words=self.extra_config.max_search_words,
-                meta_info=f"当前时间：{get_current_date()}"
+                meta_info=f"当前时间：{get_current_date()}",
             )
 
             planning_result = ""
 
             async for chunk in stream:
-                print(f"#### debug chunk: {type(chunk)}, {chunk}")
+                # print(f"#### debug chunk: {type(chunk)}, {chunk}")
                 if hasattr(chunk.choices[0].delta, 'reasoning_content') and chunk.choices[0].delta.reasoning_content:
                     yield chunk
                 elif chunk.choices[0].delta.content:
@@ -189,11 +209,13 @@ class DeepResearch(BaseModel):
                 break
             else:
                 INFO(f"searching: {new_queries}")
-                search_results = await self.search_engine.asearch(new_queries)
+                search_results = await self.search_engine.asearch(new_queries, parent=run_id)
                 INFO(f"search result: {search_results}")
                 for search_result in search_results:
                     references.add_result(query=search_result.query, results=[search_result])
 
+
+    @lunary.chain(name="deep_research")
     async def arun_summary(self, request: ArkChatRequest, question: str, references: ResultsSummary) -> ArkChatResponse:
         llm = BaseChatLanguageModel(
             endpoint_id=self.summary_endpoint_id,
@@ -207,6 +229,7 @@ class DeepResearch(BaseModel):
             meta_info=f"当前时间：{get_current_date()}"
         )
 
+    @lunary.chain(name="deep_research")
     async def astream_summary(self, request: ArkChatRequest, question: str, references: ResultsSummary) \
             -> AsyncIterable[ArkChatCompletionChunk]:
         llm = BaseChatLanguageModel(

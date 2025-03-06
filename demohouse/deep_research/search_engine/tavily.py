@@ -18,6 +18,7 @@ from .search_engine import SearchEngine, SearchResult
 
 import asyncio
 
+import lunary
 
 class TavilySearchEngine(SearchEngine, ABC):
 
@@ -40,9 +41,11 @@ class TavilySearchEngine(SearchEngine, ABC):
         self._include_domains = include_domains
         self._exclude_domains = exclude_domains
 
+    @lunary.tool(name="tavily_search")
     def search(self, queries: List[str]) -> List[SearchResult]:
         return asyncio.run(self.asearch(queries=queries))
 
+    @lunary.tool(name="tavily_search")
     async def asearch(self, queries: List[str]) -> List[SearchResult]:
         tasks = [self._arun_search_single(query) for query in queries]
         task_results = await asyncio.gather(*tasks)
@@ -53,6 +56,7 @@ class TavilySearchEngine(SearchEngine, ABC):
     async def _arun_search_single(self, query: str) -> SearchResult:
         return await asyncio.to_thread(self._search_single, query)
 
+    
     def _search_single(self, query: str) -> SearchResult:
         response = self._tavily_client.search(
             query=query,

@@ -19,7 +19,7 @@ from openai.types.chat import ChatCompletionChunk as OpenAIChatCompletionChunk
 def cast_content_to_reasoning_content(
     chunk: ArkChatCompletionChunk,
 ) -> ArkChatCompletionChunk:
-    print(f"#### debug chunk: {type(chunk)}, {chunk}")
+    # print(f"#### debug chunk: {type(chunk)}, {chunk}")
     if isinstance(chunk, OpenAIChatCompletionChunk):
         new_chunk = OpenAIChatCompletionChunk(**chunk.__dict__)
     else:

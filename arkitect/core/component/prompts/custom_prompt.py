@@ -30,6 +30,7 @@ from langchain.schema.messages import (
     get_buffer_string,
 )
 from pydantic.v1 import validator
+from pydantic import field_serializer
 
 from arkitect.core.component.llm.model import ArkChatRequest
 
@@ -49,6 +50,11 @@ class CustomPromptTemplate(BaseChatPromptTemplate):
     - query, the current question.
     """
 
+    class Config:
+        json_encoders = {
+            Template: lambda v: v.template.source
+        }
+    
     keep_history_systems: bool = False
     keep_history_answers: bool = False
     keep_history_questions: bool = False

@@ -27,6 +27,7 @@ from deep_research import DeepResearch, ExtraConfig
 
 from utils import get_last_message
 
+
 logging.basicConfig(
     level=logging.INFO, format="[%(asctime)s][%(levelname)s] %(message)s"
 )
@@ -40,7 +41,6 @@ SEARCH_ENGINE = "tavily"
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 # optional, if you select volc bot as search engine, please configure this
 SEARCH_BOT_ID = "{YOUR_BOT_ID}"
-
 
 @task()
 async def main(
@@ -63,11 +63,13 @@ async def main(
         )
     )
 
+    run_id = "main"
+    
     if request.stream:
-        async for c in deep_research.astream_deep_research(request=request, question=last_user_message.content):
+        async for c in deep_research.astream_deep_research(request=request, question=last_user_message.content, parent=run_id):
             yield c
     else:
-        rsp = await deep_research.arun_deep_research(request=request, question=last_user_message.content)
+        rsp = await deep_research.arun_deep_research(request=request, question=last_user_message.content, parent=run_id)
         yield rsp
 
 

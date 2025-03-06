@@ -42,6 +42,8 @@ from .utils import format_ark_prompts
 from openai.types.chat import ChatCompletionChunk as OpenAIChatCompletionChunk
 from openai.types.chat import ChatCompletion as OpenAIChatCompletion
 
+import lunary
+
 class BaseChatLanguageModel(BaseLanguageModel):
     messages: List[ArkMessage]
     parameters: Optional[ArkChatParameters] = None

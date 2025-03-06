@@ -13,7 +13,7 @@ volcengine-python-sdk = ">=1.0.123"
 openpyxl = "^3.1.5"
 openai = "^1.63.0"
 tiktoken = "0.8.0"
-lunary = "^1.4.7"
+lunary = {path = "../../../lunary/packages/python-sdk", develop = true} 
 
 
 [build-system]
